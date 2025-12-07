@@ -1,8 +1,6 @@
 # tuner.so
 
-Free online guitar tuner. No ads, no tracking, no signup.
-
-🏴‍☠️
+Free online guitar tuner. No ads, no tracking, no signup. 🏴‍☠️
 
 ## Run locally
 
