@@ -10,6 +10,3 @@ Free online guitar tuner. No ads, no tracking, no signup.
 
 Just open `index.html` in a browser.
 
-## Deploy
-
-Hosted on Cloudflare Pages.
