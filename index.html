@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Guitar Tuner — No ads, no tracking, just tune</title>
+
+  <!-- SEO -->
+  <meta name="description" content="Free online guitar tuner. No ads, no signup, no tracking. Just tune your guitar and get back to playing.">
+  <meta name="keywords" content="guitar tuner, online tuner, free tuner, chromatic tuner, standard tuning, DADGAD">
+  <meta name="author" content="tuner.so">
+  <link rel="canonical" href="https://tuner.so">
+
+  <!-- Open Graph / Social -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Guitar Tuner — No ads, no tracking, just tune">
+  <meta property="og:description" content="Free online guitar tuner. No ads, no signup, no tracking. Just tune your guitar and get back to playing.">
+  <meta property="og:url" content="https://tuner.so">
+  <meta name="twitter:card" content="summary">
+
+  <!-- PWA / iOS Home Screen -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Tuner">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#1a1a18">
+
+  <!-- Icons - black flag for the pirate spirit -->
+  <link rel="icon" href="/icon-192.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+  <!-- Fonts - loaded async to avoid render blocking -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Permanent+Marker&display=swap" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Permanent+Marker&display=swap"></noscript>
+
+  <style>
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg: #1a1a18;
+      --bg-dark: #141413;
+      --cream: #faf9f5;
+      --cream-dim: #c4c3bf;
+      --orange: #d97757;
+      --orange-bright: #ff8f5a;
+      --red: #c44;
+      --blue: #4a9eff;
+      --green: #5cb85c;
+    }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+    }
+
+    body {
+      font-family: 'Space Mono', monospace;
+      background: var(--bg);
+      color: var(--cream);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      min-height: 100dvh;
+      position: relative;
+      padding: 1rem;
+    }
+
+    /* Noise texture overlay */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0.03;
+      pointer-events: none;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%' height='100%' filter='url(%23noise)'/%3E%3C/svg%3E");
+    }
+
+    /* Main container - slightly off-center */
+    .tuner {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2rem;
+      transform: translateX(-3px) rotate(-0.3deg);
+      max-width: 100%;
+    }
+
+    /* The big note display */
+    .note-display {
+      position: relative;
+      text-align: center;
+    }
+
+    .note {
+      font-family: 'Permanent Marker', cursive;
+      font-size: clamp(8rem, 30vw, 14rem);
+      line-height: 0.85;
+      color: var(--cream);
+      text-shadow: 4px 4px 0 var(--bg-dark);
+      transition: color 0.15s ease;
+      letter-spacing: -0.02em;
+    }
+
+    .note.in-tune {
+      color: var(--orange);
+      text-shadow: 4px 4px 0 var(--bg-dark), 0 0 30px rgba(217, 119, 87, 0.4);
+    }
+
+    .note-sharp {
+      font-size: clamp(2rem, 8vw, 4rem);
+      vertical-align: super;
+      margin-left: -0.1em;
+    }
+
+    .octave {
+      font-family: 'Space Mono', monospace;
+      font-size: clamp(1rem, 3vw, 1.5rem);
+      color: var(--cream-dim);
+      position: absolute;
+      bottom: 0.5rem;
+      right: -1.5rem;
+    }
+
+    /* Frequency readout - digital display style */
+    .freq-display {
+      font-family: 'Space Mono', monospace;
+      font-size: clamp(0.9rem, 2.5vw, 1.1rem);
+      color: var(--cream-dim);
+      background: var(--bg-dark);
+      padding: 0.4rem 0.8rem;
+      border: 1px solid #333;
+      letter-spacing: 0.05em;
+      transform: rotate(0.5deg);
+    }
+
+    .freq-display::before {
+      content: '';
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      background: var(--red);
+      border-radius: 50%;
+      margin-right: 0.5rem;
+      animation: blink 1s infinite;
+      box-shadow: 0 0 4px var(--red);
+    }
+
+    .freq-display.listening::before {
+      background: var(--green);
+      box-shadow: 0 0 4px var(--green);
+      animation: none;
+    }
+
+    @keyframes blink {
+      0%, 50% { opacity: 1; }
+      51%, 100% { opacity: 0.3; }
+    }
+
+    /* Tuning meter - old school radio dial style */
+    .meter {
+      width: min(340px, 90vw);
+      height: 70px;
+      background: var(--bg-dark);
+      border: 2px solid #333;
+      border-radius: 4px;
+      position: relative;
+      overflow: hidden;
+      transform: rotate(-0.5deg);
+    }
+
+    /* Glass/screen effect */
+    .meter::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        180deg,
+        rgba(255,255,255,0.03) 0%,
+        transparent 40%,
+        transparent 60%,
+        rgba(0,0,0,0.1) 100%
+      );
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    /* The scale with tick marks */
+    .meter-scale {
+      position: absolute;
+      top: 12px;
+      left: 20px;
+      right: 20px;
+      height: 30px;
+    }
+
+    .meter-ticks {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .meter-tick {
+      width: 1px;
+      height: 8px;
+      background: #444;
+    }
+
+    .meter-tick.major {
+      height: 14px;
+      background: #555;
+    }
+
+    .meter-tick.center {
+      height: 20px;
+      width: 2px;
+      background: var(--orange);
+      box-shadow: 0 0 6px rgba(217, 119, 87, 0.5);
+    }
+
+    .meter-labels {
+      position: absolute;
+      top: 22px;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.6rem;
+      color: #888;
+      font-weight: 700;
+    }
+
+    /* The scanning bar/cursor */
+    .scan-bar {
+      position: absolute;
+      top: 8px;
+      left: 50%;
+      width: 3px;
+      height: 36px;
+      background: var(--orange);
+      transform: translateX(-50%);
+      transition: left 0.08s ease-out;
+      box-shadow:
+        0 0 8px rgba(217, 119, 87, 0.6),
+        0 0 20px rgba(217, 119, 87, 0.3);
+      border-radius: 1px;
+    }
+
+    .scan-bar::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -8px;
+      right: -8px;
+      bottom: 0;
+      background: linear-gradient(90deg,
+        transparent,
+        rgba(217, 119, 87, 0.15),
+        transparent
+      );
+    }
+
+    .scan-bar.in-tune {
+      background: var(--orange-bright);
+      box-shadow:
+        0 0 12px rgba(255, 143, 90, 0.8),
+        0 0 30px rgba(255, 143, 90, 0.4);
+    }
+
+    /* Frequency markers on the dial */
+    .meter-freq-labels {
+      position: absolute;
+      bottom: 8px;
+      left: 20px;
+      right: 20px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.5rem;
+      color: #3a3a38;
+      letter-spacing: 0.05em;
+    }
+
+    /* String selector - sticker/badge style */
+    .strings {
+      display: flex;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .string-btn {
+      font-family: 'Space Mono', monospace;
+      font-size: clamp(0.8rem, 2vw, 0.9rem);
+      font-weight: 700;
+      background: transparent;
+      color: var(--cream-dim);
+      border: 2px solid #444;
+      padding: 0.5rem 0.8rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      position: relative;
+      text-transform: uppercase;
+    }
+
+    /* Only show hover on devices that support it (not touch) */
+    @media (hover: hover) {
+      .string-btn:hover {
+        border-color: var(--cream);
+        color: var(--cream);
+      }
+    }
+
+    .string-btn:focus {
+      outline: none;
+      border-color: #444;
+      color: var(--cream-dim);
+    }
+
+    .string-btn:focus.active {
+      border-color: var(--orange);
+      color: var(--bg-dark);
+    }
+
+    .string-btn.active {
+      background: var(--orange);
+      border-color: var(--orange);
+      color: var(--bg-dark);
+      transform: rotate(-1deg) scale(1.05);
+    }
+
+    .string-btn.in-tune {
+      box-shadow: 0 0 15px rgba(217, 119, 87, 0.6);
+    }
+
+    /* LED indicators */
+    .string-btn::before {
+      content: '';
+      position: absolute;
+      top: -4px;
+      right: -4px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #333;
+      border: 1px solid #222;
+    }
+
+    .string-btn.active::before {
+      background: var(--green);
+      box-shadow: 0 0 6px var(--green);
+    }
+
+    .string-btn.in-tune::before {
+      background: var(--orange-bright);
+      box-shadow: 0 0 8px var(--orange-bright);
+    }
+
+    /* Start button */
+    .start-btn {
+      font-family: 'Permanent Marker', cursive;
+      font-size: clamp(1.2rem, 4vw, 1.6rem);
+      background: var(--orange);
+      color: var(--bg-dark);
+      border: none;
+      padding: 1rem 2.5rem;
+      cursor: pointer;
+      transform: rotate(-1deg);
+      transition: all 0.15s ease;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .start-btn:hover {
+      background: var(--orange-bright);
+      transform: rotate(0.5deg) scale(1.05);
+    }
+
+    .start-btn:active {
+      transform: rotate(-0.5deg) scale(0.98);
+    }
+
+    .start-btn.listening {
+      background: var(--cream-dim);
+    }
+
+    /* Hidden when not needed */
+    .hidden {
+      display: none !important;
+    }
+
+    /* Tuning direction hint */
+    .hint {
+      font-size: clamp(0.8rem, 2vw, 0.9rem);
+      color: var(--cream-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      height: 1.5em;
+    }
+
+    .hint.sharp { color: var(--red); }
+    .hint.flat { color: var(--blue); }
+    .hint.tuned { color: var(--orange); }
+
+    /* Footer - small, out of the way */
+    .footer {
+      position: fixed;
+      bottom: 0.8rem;
+      right: 1rem;
+      font-size: 0.65rem;
+      color: #777;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .footer span {
+      opacity: 0.7;
+    }
+
+    /* Strings wrapper and label */
+    .strings-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .strings-label {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      color: #888;
+    }
+
+    /* Mobile adjustments */
+    @media (max-width: 480px) {
+      .tuner {
+        gap: 1.5rem;
+        transform: translateX(-2px) rotate(-0.2deg);
+      }
+
+      .meter {
+        height: 70px;
+      }
+
+      .string-btn {
+        padding: 0.6rem 0.7rem;
+      }
+    }
+
+    /* Landscape mobile */
+    @media (max-height: 500px) and (orientation: landscape) {
+      .tuner {
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 1rem;
+      }
+
+      .note {
+        font-size: 6rem;
+      }
+
+      .meter {
+        width: 200px;
+        height: 60px;
+      }
+    }
+
+    /* Error state */
+    .error {
+      background: var(--bg-dark);
+      border: 2px solid var(--red);
+      padding: 1.5rem;
+      max-width: 300px;
+      text-align: center;
+      transform: rotate(-0.5deg);
+    }
+
+    .error h2 {
+      font-family: 'Permanent Marker', cursive;
+      color: var(--red);
+      margin-bottom: 0.5rem;
+    }
+
+    .error p {
+      font-size: 0.85rem;
+      color: var(--cream-dim);
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <!-- Initial state: start button -->
+  <div id="start-screen" class="tuner">
+    <div class="note-display">
+      <span class="note">?</span>
+    </div>
+    <button class="start-btn" id="start-btn">Tune Up</button>
+    <p style="font-size: 0.75rem; color: var(--cream-dim); max-width: 250px; text-align: center; line-height: 1.4;">
+      needs mic access · runs 100% on your device
+    </p>
+  </div>
+
+  <!-- Tuner interface (hidden initially) -->
+  <div id="tuner-screen" class="tuner hidden">
+    <div class="note-display">
+      <span class="note" id="note">-</span>
+      <span class="octave" id="octave"></span>
+    </div>
+
+    <div class="freq-display listening" id="freq-display">
+      <span id="freq">--- Hz</span>
+    </div>
+
+    <div class="meter">
+      <div class="meter-scale">
+        <div class="meter-ticks">
+          <div class="meter-tick major"></div>
+          <div class="meter-tick"></div>
+          <div class="meter-tick"></div>
+          <div class="meter-tick major"></div>
+          <div class="meter-tick"></div>
+          <div class="meter-tick"></div>
+          <div class="meter-tick center"></div>
+          <div class="meter-tick"></div>
+          <div class="meter-tick"></div>
+          <div class="meter-tick major"></div>
+          <div class="meter-tick"></div>
+          <div class="meter-tick"></div>
+          <div class="meter-tick major"></div>
+        </div>
+        <div class="meter-labels">
+          <span>♭</span>
+          <span>♯</span>
+        </div>
+      </div>
+      <div class="meter-freq-labels">
+        <span>-50¢</span>
+        <span>0</span>
+        <span>+50¢</span>
+      </div>
+      <div class="scan-bar" id="scan-bar"></div>
+    </div>
+
+    <div class="hint" id="hint"></div>
+
+    <div class="strings-wrapper">
+      <span class="strings-label">lock to string</span>
+      <div class="strings" id="strings">
+        <button class="string-btn" data-note="E2">E2</button>
+        <button class="string-btn" data-note="A2">A2</button>
+        <button class="string-btn" data-note="D3">D3</button>
+        <button class="string-btn" data-note="G3">G3</button>
+        <button class="string-btn" data-note="B3">B3</button>
+        <button class="string-btn" data-note="E4">E4</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Error state (hidden initially) -->
+  <div id="error-screen" class="error hidden">
+    <h2>No Mic</h2>
+    <p>Can't hear your guitar without microphone access. Reload to try again.</p>
+  </div>
+
+  <!-- Footer with pirate flag -->
+  <div class="footer">
+    <span>tuner.so</span>
+    <span>🏴‍☠️</span>
+  </div>
+
+  <script>
+    // ============================================
+    // GUITAR TUNER - YIN PITCH DETECTION
+    // ============================================
+
+    // Standard tuning frequencies (in Hz)
+    const TUNING = {
+      'E2': 82.41,
+      'A2': 110.00,
+      'D3': 146.83,
+      'G3': 196.00,
+      'B3': 246.94,
+      'E4': 329.63
+    };
+
+    // All note names for detection
+    const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+    // Tuning tolerance in cents (±5 cents = in tune)
+    const TUNE_TOLERANCE = 5;
+
+    // Detection parameters
+    const MIN_RMS = 0.008;           // Minimum signal level to attempt detection
+    const YIN_THRESHOLD = 0.10;      // YIN aperiodicity threshold (lower = stricter)
+    const SMOOTH_FACTOR = 0.25;      // Scan bar smoothing (lower = smoother)
+    const NOTE_HOLD_TIME = 200;      // ms to hold note display after signal drops
+    const PITCH_HISTORY_SIZE = 5;    // Number of readings to median filter
+
+    // Guitar string frequencies for harmonic correction
+    const GUITAR_FREQS = [82.41, 110.00, 146.83, 196.00, 246.94, 329.63];
+
+    // State
+    let audioContext = null;
+    let analyser = null;
+    let mediaStream = null;
+    let isListening = false;
+    let selectedString = null;
+    let animationId = null;
+
+    // Smoothing state
+    let smoothedCents = 0;
+    let lastNoteTime = 0;
+    let lastDisplayedNote = null;
+    let lastDisplayedOctave = null;
+    let pitchHistory = [];
+
+    // DOM elements
+    const startScreen = document.getElementById('start-screen');
+    const tunerScreen = document.getElementById('tuner-screen');
+    const errorScreen = document.getElementById('error-screen');
+    const startBtn = document.getElementById('start-btn');
+    const noteEl = document.getElementById('note');
+    const octaveEl = document.getElementById('octave');
+    const freqEl = document.getElementById('freq');
+    const freqDisplay = document.getElementById('freq-display');
+    const scanBarEl = document.getElementById('scan-bar');
+    const hintEl = document.getElementById('hint');
+    const stringsContainer = document.getElementById('strings');
+
+    // ============================================
+    // YIN PITCH DETECTION ALGORITHM
+    // Based on de Cheveigné & Kawahara (2002)
+    // Optimized for guitar with harmonic awareness
+    // ============================================
+
+    function yin(buffer, sampleRate) {
+      const bufferSize = buffer.length;
+      const yinBufferSize = Math.floor(bufferSize / 2);
+
+      // Frequency range for guitar: ~70Hz (D2) to ~350Hz (E4)
+      const minTau = Math.floor(sampleRate / 400);  // High freq limit
+      const maxTau = Math.floor(sampleRate / 65);   // Low freq limit
+
+      // Step 1 & 2: Difference function (combined for efficiency)
+      const yinBuffer = new Float32Array(yinBufferSize);
+      yinBuffer[0] = 1;
+
+      let runningSum = 0;
+      for (let tau = 1; tau < yinBufferSize; tau++) {
+        let diff = 0;
+        for (let i = 0; i < yinBufferSize; i++) {
+          const delta = buffer[i] - buffer[i + tau];
+          diff += delta * delta;
+        }
+
+        runningSum += diff;
+        // Cumulative mean normalized difference (step 3)
+        yinBuffer[tau] = diff * tau / runningSum;
+      }
+
+      // Step 4: Absolute threshold - find first tau below threshold
+      let tau = minTau;
+      while (tau < maxTau) {
+        if (yinBuffer[tau] < YIN_THRESHOLD) {
+          // Find the local minimum
+          while (tau + 1 < maxTau && yinBuffer[tau + 1] < yinBuffer[tau]) {
+            tau++;
+          }
+          break;
+        }
+        tau++;
+      }
+
+      // No pitch found
+      if (tau >= maxTau || yinBuffer[tau] >= YIN_THRESHOLD) {
+        return { frequency: -1, probability: 0 };
+      }
+
+      // Step 5: Parabolic interpolation for sub-sample accuracy
+      let betterTau = tau;
+      if (tau > 0 && tau < yinBufferSize - 1) {
+        const s0 = yinBuffer[tau - 1];
+        const s1 = yinBuffer[tau];
+        const s2 = yinBuffer[tau + 1];
+        const adjustment = (s2 - s0) / (2 * (2 * s1 - s2 - s0));
+        if (Math.abs(adjustment) < 1) {
+          betterTau = tau + adjustment;
+        }
+      }
+
+      const frequency = sampleRate / betterTau;
+      const probability = 1 - yinBuffer[tau];
+
+      return { frequency, probability };
+    }
+
+    // ============================================
+    // HARMONIC CORRECTION FOR GUITAR
+    // Only correct obvious 2nd harmonic errors
+    // Don't correct 3rd harmonics (they match real strings)
+    // ============================================
+
+    function correctHarmonics(freq) {
+      // Check if this frequency is close to 2x a guitar string fundamental
+      for (const fundamental of GUITAR_FREQS) {
+        const ratio = freq / fundamental;
+        // If we're detecting ~2x a fundamental (2nd harmonic)
+        if (ratio > 1.9 && ratio < 2.1) {
+          // Check we're not near an actual string at this frequency
+          const isRealString = GUITAR_FREQS.some(f =>
+            Math.abs(freq - f) / f < 0.05  // Within 5% of a real string
+          );
+          if (!isRealString) {
+            return fundamental;  // Correct to fundamental
+          }
+        }
+      }
+      return freq;  // No correction needed
+    }
+
+    // ============================================
+    // MEDIAN FILTER FOR PITCH STABILITY
+    // ============================================
+
+    function medianFilter(value) {
+      pitchHistory.push(value);
+      if (pitchHistory.length > PITCH_HISTORY_SIZE) {
+        pitchHistory.shift();
+      }
+
+      if (pitchHistory.length < 3) {
+        return value;
+      }
+
+      const sorted = [...pitchHistory].sort((a, b) => a - b);
+      return sorted[Math.floor(sorted.length / 2)];
+    }
+
+    // ============================================
+    // NOTE DETECTION
+    // ============================================
+
+    function frequencyToNote(freq) {
+      if (freq <= 0) return null;
+
+      // A4 = 440 Hz, MIDI note 69
+      const midiNote = 12 * Math.log2(freq / 440) + 69;
+      const roundedNote = Math.round(midiNote);
+      const cents = (midiNote - roundedNote) * 100;
+
+      const noteIndex = ((roundedNote % 12) + 12) % 12;
+      const octave = Math.floor(roundedNote / 12) - 1;
+      const noteName = NOTE_NAMES[noteIndex];
+
+      return {
+        note: noteName,
+        octave: octave,
+        cents: cents,
+        frequency: freq,
+        fullNote: noteName + octave
+      };
+    }
+
+    function getCentsFromTarget(freq, targetFreq) {
+      return 1200 * Math.log2(freq / targetFreq);
+    }
+
+    // ============================================
+    // AUDIO SETUP
+    // ============================================
+
+    async function startAudio() {
+      try {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false,
+            channelCount: 1,
+            sampleRate: { ideal: 48000 }
+          }
+        });
+
+        const source = audioContext.createMediaStreamSource(mediaStream);
+
+        // Gentle high-pass to remove DC offset and sub-bass rumble only
+        const highpass = audioContext.createBiquadFilter();
+        highpass.type = 'highpass';
+        highpass.frequency.value = 50;
+        highpass.Q.value = 0.5;
+
+        analyser = audioContext.createAnalyser();
+        // 4096 samples at 48kHz = 85ms, captures ~7 cycles of low E (82Hz)
+        // This is the sweet spot recommended for guitar tuners
+        analyser.fftSize = 4096;
+        analyser.smoothingTimeConstant = 0;
+
+        source.connect(highpass);
+        highpass.connect(analyser);
+
+        isListening = true;
+        startScreen.classList.add('hidden');
+        tunerScreen.classList.remove('hidden');
+
+        detectPitch();
+      } catch (err) {
+        console.error('Audio error:', err);
+        startScreen.classList.add('hidden');
+        errorScreen.classList.remove('hidden');
+      }
+    }
+
+    // ============================================
+    // PITCH DETECTION LOOP
+    // ============================================
+
+    function detectPitch() {
+      if (!isListening) return;
+
+      const buffer = new Float32Array(analyser.fftSize);
+      analyser.getFloatTimeDomainData(buffer);
+
+      // Check if there's enough signal
+      let rms = 0;
+      for (let i = 0; i < buffer.length; i++) {
+        rms += buffer[i] * buffer[i];
+      }
+      rms = Math.sqrt(rms / buffer.length);
+
+      const now = performance.now();
+
+      if (rms < MIN_RMS) {
+        // Too quiet - check if we should hold the last note
+        if (now - lastNoteTime > NOTE_HOLD_TIME) {
+          noteEl.textContent = '-';
+          noteEl.classList.remove('in-tune');
+          octaveEl.textContent = '';
+          freqEl.textContent = '--- Hz';
+          hintEl.textContent = 'play a string';
+          hintEl.className = 'hint';
+          // Smoothly return scan bar to center
+          smoothedCents = smoothedCents * 0.8;
+          const scanPos = 50 + (smoothedCents / 50) * 40; // 10% to 90% range
+          scanBarEl.style.left = `${scanPos}%`;
+          scanBarEl.classList.remove('in-tune');
+          updateStringButtons(null, false);
+          lastDisplayedNote = null;
+          lastDisplayedOctave = null;
+          pitchHistory = [];
+        }
+      } else {
+        const result = yin(buffer, audioContext.sampleRate);
+
+        if (result.frequency > 0 && result.probability > 0.8) {
+          // Apply harmonic correction then median filter
+          const correctedFreq = correctHarmonics(result.frequency);
+          const filteredFreq = medianFilter(correctedFreq);
+          const noteInfo = frequencyToNote(filteredFreq);
+
+          if (noteInfo) {
+            lastNoteTime = now;
+
+            // Update note display (with some hysteresis to prevent flickering)
+            const noteChanged = noteInfo.note !== lastDisplayedNote || noteInfo.octave !== lastDisplayedOctave;
+
+            if (noteChanged) {
+              lastDisplayedNote = noteInfo.note;
+              lastDisplayedOctave = noteInfo.octave;
+
+              if (noteInfo.note.includes('#')) {
+                noteEl.innerHTML = noteInfo.note[0] + '<span class="note-sharp">♯</span>';
+              } else {
+                noteEl.textContent = noteInfo.note;
+              }
+              octaveEl.textContent = noteInfo.octave;
+            }
+
+            freqEl.textContent = filteredFreq.toFixed(1) + ' Hz';
+
+            // Calculate cents deviation
+            let cents = noteInfo.cents;
+
+            // If a string is selected, calculate cents from that target
+            if (selectedString && TUNING[selectedString]) {
+              cents = getCentsFromTarget(filteredFreq, TUNING[selectedString]);
+            }
+
+            // Smooth the cents for scan bar display
+            smoothedCents = smoothedCents + (cents - smoothedCents) * SMOOTH_FACTOR;
+
+            // Position scan bar: center is 50%, range is 10% to 90%
+            const clampedCents = Math.max(-50, Math.min(50, smoothedCents));
+            const scanPos = 50 + (clampedCents / 50) * 40;
+            scanBarEl.style.left = `${scanPos}%`;
+
+            // Check if in tune (use smoothed value for stability)
+            const isInTune = Math.abs(smoothedCents) <= TUNE_TOLERANCE;
+
+            if (isInTune) {
+              noteEl.classList.add('in-tune');
+              scanBarEl.classList.add('in-tune');
+              hintEl.textContent = '✓ in tune';
+              hintEl.className = 'hint tuned';
+            } else if (smoothedCents > 0) {
+              noteEl.classList.remove('in-tune');
+              scanBarEl.classList.remove('in-tune');
+              hintEl.textContent = 'tune down ↓';
+              hintEl.className = 'hint sharp';
+            } else {
+              noteEl.classList.remove('in-tune');
+              scanBarEl.classList.remove('in-tune');
+              hintEl.textContent = 'tune up ↑';
+              hintEl.className = 'hint flat';
+            }
+
+            // Update string buttons based on detected note
+            updateStringButtons(noteInfo.fullNote, isInTune);
+          }
+        }
+      }
+
+      animationId = requestAnimationFrame(detectPitch);
+    }
+
+    // ============================================
+    // UI UPDATES
+    // ============================================
+
+    function updateStringButtons(detectedNote, isInTune) {
+      const buttons = stringsContainer.querySelectorAll('.string-btn');
+      buttons.forEach(btn => {
+        const btnNote = btn.dataset.note;
+        btn.classList.remove('in-tune');
+
+        if (btnNote === selectedString) {
+          btn.classList.add('active');
+          if (isInTune && detectedNote) {
+            const targetNote = btnNote.replace(/[0-9]/g, '');
+            const detected = detectedNote.replace(/[0-9]/g, '');
+            if (targetNote === detected) {
+              btn.classList.add('in-tune');
+            }
+          }
+        } else {
+          btn.classList.remove('active');
+        }
+      });
+    }
+
+    function selectString(note, btn) {
+      selectedString = selectedString === note ? null : note;
+      updateStringButtons(null, false);
+      // Reset smoothing when changing target
+      pitchHistory = [];
+      // Remove focus to prevent stuck visual state
+      if (btn) btn.blur();
+    }
+
+    // ============================================
+    // EVENT LISTENERS
+    // ============================================
+
+    startBtn.addEventListener('click', startAudio);
+
+    stringsContainer.addEventListener('click', (e) => {
+      if (e.target.classList.contains('string-btn')) {
+        selectString(e.target.dataset.note, e.target);
+      }
+    });
+
+    // Handle visibility change (pause when tab hidden)
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden && animationId) {
+        cancelAnimationFrame(animationId);
+      } else if (!document.hidden && isListening) {
+        detectPitch();
+      }
+    });
+
+    // Prevent zoom on double tap (mobile)
+    document.addEventListener('touchend', (e) => {
+      if (e.target.closest('.string-btn') || e.target.closest('.start-btn')) {
+        e.preventDefault();
+        e.target.click();
+      }
+    }, { passive: false });
+
+  </script>
+<!-- Cloudflare Pages Analytics --><script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "cfd1e304433e4145abb4eff141db704e"}'></script><!-- Cloudflare Pages Analytics --><script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9aa7e26ccb504e1a',t:'MTc2NTE1MDk5OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
